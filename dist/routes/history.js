@@ -42,7 +42,7 @@ router.post('/adjust', (req, res) => {
         productName: product.name,
         category: product.category,
         type: type === 'add' ? 'add' : 'minus',
-        changeQty: delta,
+        changeQty: type === 'add' ? Math.abs(delta) : -Math.abs(delta),
         previousQty,
         newQty,
         unit: product.unit,
