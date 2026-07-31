@@ -20,10 +20,14 @@ router.post('/adjust', (req: Request, res: Response) => {
   const { productId, type, changeQty, note } = req.body;
 
   const products = getProducts();
-  const index = products.findIndex(p => p.id === productId);
+  let index = products.findIndex(p => p.id === productId);
+
+  if (index === -1 && productId) {
+    index = products.findIndex(p => p.name.toLowerCase() === productId.toLowerCase());
+  }
 
   if (index === -1) {
-    res.status(404).json({ error: 'Product not found' });
+    res.status(404).json({ error: 'Product no longer exists in inventory. Please refresh the page.' });
     return;
   }
 
