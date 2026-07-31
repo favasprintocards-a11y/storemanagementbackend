@@ -1,0 +1,83 @@
+{
+  "categories": [
+    "Blank Cards"
+  ],
+  "products": [
+    {
+      "id": "PRD-1785477707431",
+      "name": "Pacto",
+      "category": "Blank Cards",
+      "quantity": 1000,
+      "minThreshold": 19999,
+      "unit": "Peices",
+      "status": "Low Stock",
+      "description": "",
+      "lastUpdated": "2026-07-31T06:02:21.151Z"
+    },
+    {
+      "id": "PRD-1785477634311",
+      "name": "Pacto",
+      "category": "PVC Blank Cards",
+      "quantity": 10000,
+      "minThreshold": 5,
+      "unit": "pieces",
+      "status": "In Stock",
+      "description": "",
+      "lastUpdated": "2026-07-31T06:00:34.311Z"
+    }
+  ],
+  "historyLogs": [
+    {
+      "id": "LOG-1785477741160",
+      "productId": "PRD-1785477707431",
+      "productName": "Pacto",
+      "category": "Blank Cards",
+      "type": "minus",
+      "changeQty": 7000,
+      "previousQty": 8000,
+      "newQty": 1000,
+      "unit": "Peices",
+      "timestamp": "2026-07-31T06:02:21.160Z",
+      "note": "Stock reduced"
+    },
+    {
+      "id": "LOG-1785477732239",
+      "productId": "PRD-1785477707431",
+      "productName": "Pacto",
+      "category": "Blank Cards",
+      "type": "minus",
+      "changeQty": 2000,
+      "previousQty": 10000,
+      "newQty": 8000,
+      "unit": "Peices",
+      "timestamp": "2026-07-31T06:02:12.239Z",
+      "note": "Stock reduced"
+    },
+    {
+      "id": "LOG-1785477707432",
+      "productId": "PRD-1785477707431",
+      "productName": "Pacto",
+      "category": "Blank Cards",
+      "type": "create",
+      "changeQty": 10000,
+      "previousQty": 0,
+      "newQty": 10000,
+      "unit": "Peices",
+      "timestamp": "2026-07-31T06:01:47.432Z",
+      "note": "Initial product creation"
+    },
+    {
+      "id": "LOG-1785477634318",
+      "productId": "PRD-1785477634311",
+      "productName": "Pacto",
+      "category": "PVC Blank Cards",
+      "type": "create",
+      "changeQty": 10000,
+      "previousQty": 0,
+      "newQty": 10000,
+      "unit": "pieces",
+      "timestamp": "2026-07-31T06:00:34.318Z",
+      "note": "Initial product creation"
+    }
+  ]
+}
