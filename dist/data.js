@@ -4,17 +4,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_FILE = path.join(__dirname, '../data.json');
-export const INITIAL_CATEGORIES = [
-    'PVC Blank Cards',
-    'Paper & Media',
-    'Apparel',
-    'Custom Merch',
-    'Packaging',
-    'Office & Supplies',
-    'Ink & Toners'
-];
+export const INITIAL_CATEGORIES = [];
 let store = {
-    categories: INITIAL_CATEGORIES,
+    categories: [],
     products: [],
     historyLogs: []
 };
@@ -44,7 +36,7 @@ export function saveData() {
 }
 export function getCategories() {
     loadData();
-    return store.categories && store.categories.length > 0 ? store.categories : INITIAL_CATEGORIES;
+    return store.categories || [];
 }
 export function setCategories(categories) {
     store.categories = categories;

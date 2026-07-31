@@ -7,15 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_FILE = path.join(__dirname, '../data.json');
 
-export const INITIAL_CATEGORIES: string[] = [
-  'PVC Blank Cards',
-  'Paper & Media',
-  'Apparel',
-  'Custom Merch',
-  'Packaging',
-  'Office & Supplies',
-  'Ink & Toners'
-];
+export const INITIAL_CATEGORIES: string[] = [];
 
 interface StoreData {
   categories: string[];
@@ -24,7 +16,7 @@ interface StoreData {
 }
 
 let store: StoreData = {
-  categories: INITIAL_CATEGORIES,
+  categories: [],
   products: [],
   historyLogs: []
 };
@@ -54,7 +46,7 @@ export function saveData(): void {
 
 export function getCategories(): string[] {
   loadData();
-  return store.categories && store.categories.length > 0 ? store.categories : INITIAL_CATEGORIES;
+  return store.categories || [];
 }
 
 export function setCategories(categories: string[]): string[] {
