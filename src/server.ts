@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 import { loadData } from './data.js';
 import productsRouter from './routes/products.js';
 import categoriesRouter from './routes/categories.js';
@@ -10,12 +11,20 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
-// Load stored data
+// Load stored local data as fallback
 loadData();
 
-// Middleware - Allow CORS for all dev origins
+// Connect to MongoDB Atlas if MONGODB_URI is provided
+const MONGODB_URI = process.env.MONGODB_URI;
+if (MONGODB_URI) {
+  mongoose
+    .connect(MONGODB_URI)
+    .then(() => console.log('🍃 Connected to MongoDB Atlas Cloud Database'))
+    .catch((err) => console.error('⚠️ MongoDB Atlas Connection Error:', err.message));
+}
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -26,7 +35,12 @@ app.use('/api/history', historyRouter);
 
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'Printo Store Backend', time: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    service: 'Printo Store Backend',
+    db: mongoose.connection.readyState === 1 ? 'MongoDB Atlas' : 'Local JSON Store',
+    time: new Date().toISOString()
+  });
 });
 
 app.listen(PORT, () => {
