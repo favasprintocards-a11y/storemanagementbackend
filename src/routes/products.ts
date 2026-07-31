@@ -69,10 +69,36 @@ router.post('/', (req: Request, res: Response) => {
 router.put('/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   const products = getProducts();
-  const index = products.findIndex(p => p.id === id);
+  let index = products.findIndex(p => p.id === id);
+
+  if (index === -1 && id) {
+    index = products.findIndex(p => p.id.toLowerCase() === id.toLowerCase());
+  }
+  if (index === -1 && req.body.name) {
+    index = products.findIndex(p => p.name.toLowerCase() === req.body.name.toLowerCase());
+  }
 
   if (index === -1) {
-    res.status(404).json({ error: 'Product not found' });
+    // Upsert product seamlessly if missing from database
+    const { name, category, quantity, minThreshold, unit, image, supplier, description } = req.body;
+    const qty = Number(quantity) || 0;
+    const threshold = Number(minThreshold) || 5;
+    const newItem: InventoryItem = {
+      id: id || `PRD-${Date.now()}`,
+      name: name || 'New Product',
+      category: category || 'General',
+      quantity: qty,
+      minThreshold: threshold,
+      unit: unit || 'piece',
+      status: calculateStatus(qty, threshold),
+      image,
+      supplier,
+      description,
+      lastUpdated: new Date().toISOString()
+    };
+    products.unshift(newItem);
+    setProducts(products);
+    res.status(200).json(newItem);
     return;
   }
 
