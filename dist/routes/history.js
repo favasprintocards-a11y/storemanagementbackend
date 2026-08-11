@@ -79,7 +79,7 @@ router.get('/', async (req, res) => {
 });
 // POST record stock adjustment
 router.post('/adjust', async (req, res) => {
-    const { productId, type, changeQty, note } = req.body;
+    const { productId, type, changeQty, note, timestamp } = req.body;
     const products = await getProducts();
     let index = products.findIndex(p => p.id === productId);
     if (index === -1 && productId) {
@@ -93,10 +93,11 @@ router.post('/adjust', async (req, res) => {
     const delta = Number(changeQty) || 0;
     const previousQty = product.quantity;
     const newQty = type === 'add' ? previousQty + delta : Math.max(0, previousQty - delta);
+    const logTimestamp = timestamp ? new Date(timestamp).toISOString() : new Date().toISOString();
     // Update product quantity and status
     product.quantity = newQty;
     product.status = calculateStatus(newQty, product.minThreshold);
-    product.lastUpdated = new Date().toISOString();
+    product.lastUpdated = logTimestamp;
     products[index] = product;
     await setProducts(products);
     // Log stock history
@@ -111,7 +112,7 @@ router.post('/adjust', async (req, res) => {
         previousQty,
         newQty,
         unit: product.unit,
-        timestamp: new Date().toISOString(),
+        timestamp: logTimestamp,
         note: note || (type === 'add' ? 'Stock added' : 'Stock reduced')
     };
     logs.unshift(logEntry);
