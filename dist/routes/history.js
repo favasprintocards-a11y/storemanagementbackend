@@ -8,9 +8,65 @@ function calculateStatus(qty, threshold) {
         return 'Low Stock';
     return 'In Stock';
 }
-// GET history logs
-router.get('/', (_req, res) => {
-    res.json(getHistoryLogs());
+function isWithinDateRange(timestampStr, dateRange, startDate, endDate) {
+    if (!dateRange || dateRange === 'all')
+        return true;
+    if (!timestampStr)
+        return false;
+    const itemDate = new Date(timestampStr);
+    if (isNaN(itemDate.getTime()))
+        return true;
+    const now = new Date();
+    if (dateRange === 'today') {
+        return itemDate.getDate() === now.getDate() && itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
+    }
+    if (dateRange === 'yesterday') {
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        return itemDate.getDate() === yesterday.getDate() && itemDate.getMonth() === yesterday.getMonth() && itemDate.getFullYear() === yesterday.getFullYear();
+    }
+    if (dateRange === '7days') {
+        const d = new Date(now);
+        d.setDate(now.getDate() - 7);
+        d.setHours(0, 0, 0, 0);
+        return itemDate >= d && itemDate <= now;
+    }
+    if (dateRange === '30days') {
+        const d = new Date(now);
+        d.setDate(now.getDate() - 30);
+        d.setHours(0, 0, 0, 0);
+        return itemDate >= d && itemDate <= now;
+    }
+    if (dateRange === 'this_month') {
+        return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
+    }
+    if (dateRange === 'custom') {
+        if (startDate) {
+            const s = new Date(startDate);
+            s.setHours(0, 0, 0, 0);
+            if (itemDate < s)
+                return false;
+        }
+        if (endDate) {
+            const e = new Date(endDate);
+            e.setHours(23, 59, 59, 999);
+            if (itemDate > e)
+                return false;
+        }
+        return true;
+    }
+    return true;
+}
+// GET history logs with optional date range query params
+router.get('/', (req, res) => {
+    const { dateRange, startDate, endDate } = req.query;
+    const logs = getHistoryLogs();
+    if (!dateRange || dateRange === 'all') {
+        res.json(logs);
+        return;
+    }
+    const filtered = logs.filter(log => isWithinDateRange(log.timestamp, String(dateRange), startDate ? String(startDate) : undefined, endDate ? String(endDate) : undefined));
+    res.json(filtered);
 });
 // POST record stock adjustment
 router.post('/adjust', (req, res) => {

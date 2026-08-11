@@ -10,9 +10,66 @@ function calculateStatus(qty: number, threshold: number): StockStatus {
   return 'In Stock';
 }
 
-// GET all products
-router.get('/', (_req: Request, res: Response) => {
-  res.json(getProducts());
+function isWithinDateRange(timestampStr: string, dateRange?: string, startDate?: string, endDate?: string): boolean {
+  if (!dateRange || dateRange === 'all') return true;
+  if (!timestampStr) return false;
+  const itemDate = new Date(timestampStr);
+  if (isNaN(itemDate.getTime())) return true;
+  const now = new Date();
+
+  if (dateRange === 'today') {
+    return itemDate.getDate() === now.getDate() && itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
+  }
+  if (dateRange === 'yesterday') {
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    return itemDate.getDate() === yesterday.getDate() && itemDate.getMonth() === yesterday.getMonth() && itemDate.getFullYear() === yesterday.getFullYear();
+  }
+  if (dateRange === '7days') {
+    const d = new Date(now);
+    d.setDate(now.getDate() - 7);
+    d.setHours(0, 0, 0, 0);
+    return itemDate >= d && itemDate <= now;
+  }
+  if (dateRange === '30days') {
+    const d = new Date(now);
+    d.setDate(now.getDate() - 30);
+    d.setHours(0, 0, 0, 0);
+    return itemDate >= d && itemDate <= now;
+  }
+  if (dateRange === 'this_month') {
+    return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
+  }
+  if (dateRange === 'custom') {
+    if (startDate) {
+      const s = new Date(startDate);
+      s.setHours(0, 0, 0, 0);
+      if (itemDate < s) return false;
+    }
+    if (endDate) {
+      const e = new Date(endDate);
+      e.setHours(23, 59, 59, 999);
+      if (itemDate > e) return false;
+    }
+    return true;
+  }
+  return true;
+}
+
+// GET all products with optional date query parameters
+router.get('/', (req: Request, res: Response) => {
+  const { dateRange, startDate, endDate } = req.query;
+  const products = getProducts();
+
+  if (!dateRange || dateRange === 'all') {
+    res.json(products);
+    return;
+  }
+
+  const filtered = products.filter(p =>
+    isWithinDateRange(p.lastUpdated, String(dateRange), startDate ? String(startDate) : undefined, endDate ? String(endDate) : undefined)
+  );
+  res.json(filtered);
 });
 
 // POST create product
