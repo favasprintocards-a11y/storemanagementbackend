@@ -178,16 +178,17 @@ router.put('/:id', (req, res) => {
 });
 // DELETE product
 router.delete('/:id', (req, res) => {
-    const { id } = req.params;
+    const targetId = req.params.id ? decodeURIComponent(req.params.id).trim() : '';
     const products = getProducts();
-    const item = products.find(p => p.id === id);
-    if (!item) {
-        res.status(404).json({ error: 'Product not found' });
+    const index = products.findIndex(p => p.id === targetId || p.id.toLowerCase() === targetId.toLowerCase() || p.name.toLowerCase() === targetId.toLowerCase());
+    if (index === -1) {
+        res.status(404).json({ error: `Product "${targetId}" not found in inventory` });
         return;
     }
-    const updatedProducts = products.filter(p => p.id !== id);
+    const item = products[index];
+    const updatedProducts = products.filter((_, i) => i !== index);
     setProducts(updatedProducts);
-    // Add history log
+    // Add history log for deletion
     const logs = getHistoryLogs();
     const deleteLog = {
         id: `LOG-${Date.now()}`,
@@ -204,6 +205,6 @@ router.delete('/:id', (req, res) => {
     };
     logs.unshift(deleteLog);
     setHistoryLogs(logs);
-    res.json({ message: 'Product deleted successfully', id });
+    res.json({ message: 'Product deleted successfully', id: item.id });
 });
 export default router;

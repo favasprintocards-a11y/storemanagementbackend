@@ -131,12 +131,14 @@ export const DEFAULT_HISTORY: StockHistoryLog[] = [
 ];
 
 interface StoreData {
+  isInitialized: boolean;
   categories: string[];
   products: InventoryItem[];
   historyLogs: StockHistoryLog[];
 }
 
 let store: StoreData = {
+  isInitialized: false,
   categories: [...DEFAULT_CATEGORIES],
   products: [...DEFAULT_PRODUCTS],
   historyLogs: [...DEFAULT_HISTORY]
@@ -149,29 +151,32 @@ export function loadData(): void {
       const fileData = fs.readFileSync(DATA_FILE, 'utf-8');
       const parsed = JSON.parse(fileData);
       
-      const loadedCats = Array.isArray(parsed.categories) && parsed.categories.length > 0
-        ? parsed.categories
+      const isInitialized = Boolean(parsed.isInitialized);
+      
+      const loadedCats = Array.isArray(parsed.categories)
+        ? (parsed.categories.length === 0 && !isInitialized ? DEFAULT_CATEGORIES : parsed.categories)
         : DEFAULT_CATEGORIES;
 
-      const loadedProds = Array.isArray(parsed.products) && parsed.products.length > 0
-        ? parsed.products
+      const loadedProds = Array.isArray(parsed.products)
+        ? (parsed.products.length === 0 && !isInitialized ? DEFAULT_PRODUCTS : parsed.products)
         : DEFAULT_PRODUCTS;
 
-      const loadedLogs = Array.isArray(parsed.historyLogs) && parsed.historyLogs.length > 0
-        ? parsed.historyLogs
+      const loadedLogs = Array.isArray(parsed.historyLogs)
+        ? (parsed.historyLogs.length === 0 && !isInitialized ? DEFAULT_HISTORY : parsed.historyLogs)
         : DEFAULT_HISTORY;
 
       store = {
+        isInitialized: true,
         categories: loadedCats,
         products: loadedProds,
         historyLogs: loadedLogs
       };
 
-      // Save if initialized with default seed data
-      if (!parsed.categories?.length || !parsed.products?.length) {
+      if (!isInitialized) {
         saveData();
       }
     } else {
+      store.isInitialized = true;
       saveData();
     }
   } catch (err) {
@@ -195,8 +200,10 @@ export async function syncWithMongoDB(): Promise<void> {
   try {
     // 1. Sync Categories
     const mongoCats = await CategoryModel.find().lean();
-    if (mongoCats.length === 0) {
-      // Seed Mongo categories
+    if (mongoCats.length === 0 && (!store.categories || store.categories.length === 0)) {
+      store.categories = [...DEFAULT_CATEGORIES];
+      await CategoryModel.insertMany(store.categories.map(name => ({ name })));
+    } else if (mongoCats.length === 0 && store.categories.length > 0) {
       await CategoryModel.insertMany(store.categories.map(name => ({ name })));
     } else {
       store.categories = mongoCats.map(c => c.name);
@@ -204,8 +211,10 @@ export async function syncWithMongoDB(): Promise<void> {
 
     // 2. Sync Products
     const mongoProds = await ProductModel.find().lean();
-    if (mongoProds.length === 0) {
-      // Seed Mongo products
+    if (mongoProds.length === 0 && (!store.products || store.products.length === 0)) {
+      store.products = [...DEFAULT_PRODUCTS];
+      await ProductModel.insertMany(store.products);
+    } else if (mongoProds.length === 0 && store.products.length > 0) {
       await ProductModel.insertMany(store.products);
     } else {
       store.products = mongoProds.map(p => ({
@@ -225,8 +234,10 @@ export async function syncWithMongoDB(): Promise<void> {
 
     // 3. Sync History
     const mongoLogs = await HistoryModel.find().sort({ createdAt: -1 }).lean();
-    if (mongoLogs.length === 0) {
-      // Seed Mongo history logs
+    if (mongoLogs.length === 0 && (!store.historyLogs || store.historyLogs.length === 0)) {
+      store.historyLogs = [...DEFAULT_HISTORY];
+      await HistoryModel.insertMany(store.historyLogs);
+    } else if (mongoLogs.length === 0 && store.historyLogs.length > 0) {
       await HistoryModel.insertMany(store.historyLogs);
     } else {
       store.historyLogs = mongoLogs.map(l => ({
@@ -250,57 +261,6 @@ export async function syncWithMongoDB(): Promise<void> {
   }
 }
 
-// Background helper to push updates to Mongo
-async function pushCategoryToMongo(name: string): Promise<void> {
-  if (mongoose.connection.readyState === 1) {
-    try {
-      await CategoryModel.updateOne({ name }, { name }, { upsert: true });
-    } catch (e) {
-      console.error('Failed to push category to MongoDB:', e);
-    }
-  }
-}
-
-async function removeCategoryFromMongo(name: string): Promise<void> {
-  if (mongoose.connection.readyState === 1) {
-    try {
-      await CategoryModel.deleteOne({ name });
-    } catch (e) {
-      console.error('Failed to remove category from MongoDB:', e);
-    }
-  }
-}
-
-async function pushProductToMongo(prod: InventoryItem): Promise<void> {
-  if (mongoose.connection.readyState === 1) {
-    try {
-      await ProductModel.updateOne({ id: prod.id }, prod, { upsert: true });
-    } catch (e) {
-      console.error('Failed to push product to MongoDB:', e);
-    }
-  }
-}
-
-async function removeProductFromMongo(id: string): Promise<void> {
-  if (mongoose.connection.readyState === 1) {
-    try {
-      await ProductModel.deleteOne({ id });
-    } catch (e) {
-      console.error('Failed to remove product from MongoDB:', e);
-    }
-  }
-}
-
-async function pushLogToMongo(log: StockHistoryLog): Promise<void> {
-  if (mongoose.connection.readyState === 1) {
-    try {
-      await HistoryModel.updateOne({ id: log.id }, log, { upsert: true });
-    } catch (e) {
-      console.error('Failed to push log to MongoDB:', e);
-    }
-  }
-}
-
 export function getCategories(): string[] {
   loadData();
   return store.categories || [];
@@ -311,7 +271,9 @@ export function setCategories(categories: string[]): string[] {
   saveData();
   if (mongoose.connection.readyState === 1) {
     CategoryModel.deleteMany({}).then(() => {
-      CategoryModel.insertMany(categories.map(name => ({ name }))).catch(console.error);
+      if (categories.length > 0) {
+        CategoryModel.insertMany(categories.map(name => ({ name }))).catch(console.error);
+      }
     }).catch(console.error);
   }
   return store.categories;
@@ -327,7 +289,9 @@ export function setProducts(products: InventoryItem[]): InventoryItem[] {
   saveData();
   if (mongoose.connection.readyState === 1) {
     ProductModel.deleteMany({}).then(() => {
-      ProductModel.insertMany(products).catch(console.error);
+      if (products.length > 0) {
+        ProductModel.insertMany(products).catch(console.error);
+      }
     }).catch(console.error);
   }
   return store.products;
@@ -343,7 +307,9 @@ export function setHistoryLogs(logs: StockHistoryLog[]): StockHistoryLog[] {
   saveData();
   if (mongoose.connection.readyState === 1) {
     HistoryModel.deleteMany({}).then(() => {
-      HistoryModel.insertMany(logs).catch(console.error);
+      if (logs.length > 0) {
+        HistoryModel.insertMany(logs).catch(console.error);
+      }
     }).catch(console.error);
   }
   return store.historyLogs;
