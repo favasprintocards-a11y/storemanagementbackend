@@ -66,9 +66,9 @@ function isWithinDateRange(timestampStr: string, dateRange?: string, startDate?:
 }
 
 // GET history logs with optional date range query params
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   const { dateRange, startDate, endDate, selectedMonth } = req.query;
-  const logs = getHistoryLogs();
+  const logs = await getHistoryLogs();
   
   if (!dateRange || dateRange === 'all') {
     res.json(logs);
@@ -88,10 +88,10 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // POST record stock adjustment
-router.post('/adjust', (req: Request, res: Response) => {
+router.post('/adjust', async (req: Request, res: Response) => {
   const { productId, type, changeQty, note } = req.body;
 
-  const products = getProducts();
+  const products = await getProducts();
   let index = products.findIndex(p => p.id === productId);
 
   if (index === -1 && productId) {
@@ -113,10 +113,10 @@ router.post('/adjust', (req: Request, res: Response) => {
   product.status = calculateStatus(newQty, product.minThreshold);
   product.lastUpdated = new Date().toISOString();
   products[index] = product;
-  setProducts(products);
+  await setProducts(products);
 
   // Log stock history
-  const logs = getHistoryLogs();
+  const logs = await getHistoryLogs();
   const logEntry: StockHistoryLog = {
     id: `LOG-${Date.now()}`,
     productId: product.id,
@@ -132,23 +132,23 @@ router.post('/adjust', (req: Request, res: Response) => {
   };
 
   logs.unshift(logEntry);
-  setHistoryLogs(logs);
+  await setHistoryLogs(logs);
 
   res.status(201).json({ product, log: logEntry });
 });
 
 // DELETE a specific log entry by log ID or product ID
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const logs = getHistoryLogs();
+  const logs = await getHistoryLogs();
   const filtered = logs.filter(l => l.id !== id && l.productId !== id);
-  setHistoryLogs(filtered);
+  await setHistoryLogs(filtered);
   res.json(filtered);
 });
 
 // DELETE clear all history logs
-router.delete('/', (_req: Request, res: Response) => {
-  setHistoryLogs([]);
+router.delete('/', async (_req: Request, res: Response) => {
+  await setHistoryLogs([]);
   res.json([]);
 });
 

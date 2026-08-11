@@ -67,9 +67,9 @@ function isWithinDateRange(timestampStr, dateRange, startDate, endDate, selected
     return true;
 }
 // GET all products with optional date query parameters
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
     const { dateRange, startDate, endDate, selectedMonth } = req.query;
-    const products = getProducts();
+    const products = await getProducts();
     if (!dateRange || dateRange === 'all') {
         res.json(products);
         return;
@@ -78,13 +78,13 @@ router.get('/', (req, res) => {
     res.json(filtered);
 });
 // POST create product
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
     const { name, category, quantity, minThreshold, unit, image, supplier, description } = req.body;
     if (!name || !category) {
         res.status(400).json({ error: 'Name and category are required' });
         return;
     }
-    const products = getProducts();
+    const products = await getProducts();
     const qty = Number(quantity) || 0;
     const threshold = Number(minThreshold) || 5;
     const newItem = {
@@ -101,9 +101,9 @@ router.post('/', (req, res) => {
         lastUpdated: new Date().toISOString()
     };
     products.unshift(newItem);
-    setProducts(products);
+    await setProducts(products);
     // Add history log
-    const logs = getHistoryLogs();
+    const logs = await getHistoryLogs();
     const newLog = {
         id: `LOG-${Date.now()}`,
         productId: newItem.id,
@@ -118,13 +118,13 @@ router.post('/', (req, res) => {
         note: 'Initial product creation'
     };
     logs.unshift(newLog);
-    setHistoryLogs(logs);
+    await setHistoryLogs(logs);
     res.status(201).json(newItem);
 });
 // PUT update product
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const products = getProducts();
+    const products = await getProducts();
     let index = products.findIndex(p => p.id === id);
     if (index === -1 && id) {
         index = products.findIndex(p => p.id.toLowerCase() === id.toLowerCase());
@@ -151,7 +151,7 @@ router.put('/:id', (req, res) => {
             lastUpdated: new Date().toISOString()
         };
         products.unshift(newItem);
-        setProducts(products);
+        await setProducts(products);
         res.status(200).json(newItem);
         return;
     }
@@ -173,13 +173,13 @@ router.put('/:id', (req, res) => {
         lastUpdated: new Date().toISOString()
     };
     products[index] = updatedItem;
-    setProducts(products);
+    await setProducts(products);
     res.json(updatedItem);
 });
 // DELETE product
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
     const targetId = req.params.id ? decodeURIComponent(req.params.id).trim() : '';
-    const products = getProducts();
+    const products = await getProducts();
     const index = products.findIndex(p => p.id === targetId || p.id.toLowerCase() === targetId.toLowerCase() || p.name.toLowerCase() === targetId.toLowerCase());
     if (index === -1) {
         res.status(404).json({ error: `Product "${targetId}" not found in inventory` });
@@ -187,9 +187,9 @@ router.delete('/:id', (req, res) => {
     }
     const item = products[index];
     const updatedProducts = products.filter((_, i) => i !== index);
-    setProducts(updatedProducts);
+    await setProducts(updatedProducts);
     // Add history log for deletion
-    const logs = getHistoryLogs();
+    const logs = await getHistoryLogs();
     const deleteLog = {
         id: `LOG-${Date.now()}`,
         productId: item.id,
@@ -204,7 +204,7 @@ router.delete('/:id', (req, res) => {
         note: 'Product deleted from inventory'
     };
     logs.unshift(deleteLog);
-    setHistoryLogs(logs);
+    await setHistoryLogs(logs);
     res.json({ message: 'Product deleted successfully', id: item.id });
 });
 export default router;

@@ -8,200 +8,119 @@ import { HistoryModel } from './models/History.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_FILE = path.join(__dirname, '../data.json');
-export const DEFAULT_CATEGORIES = [
-    'Paper & Media',
-    'Apparel & Fabrics',
-    'Vinyl & Banner Media',
-    'Inks & Toners',
-    'Packaging & Boxes',
-    'Merch & Promo Supplies'
-];
-export const DEFAULT_PRODUCTS = [
-    {
-        id: 'PRD-101',
-        name: 'Glossy Photo Paper 250gsm (A4, Pack of 100)',
-        category: 'Paper & Media',
-        quantity: 45,
-        minThreshold: 10,
-        unit: 'packs',
-        status: 'In Stock',
-        image: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300&auto=format&fit=crop&q=80',
-        supplier: 'PaperCraft Ltd',
-        description: 'High-grade 250gsm glossy finish inkjet photo printing paper.',
-        lastUpdated: new Date().toISOString()
-    },
-    {
-        id: 'PRD-102',
-        name: 'Heavy Cotton Round Neck T-Shirt (White - L)',
-        category: 'Apparel & Fabrics',
-        quantity: 8,
-        minThreshold: 15,
-        unit: 'pcs',
-        status: 'Low Stock',
-        image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300&auto=format&fit=crop&q=80',
-        supplier: 'TexPrint Garments',
-        description: '100% combed cotton blank t-shirts for screen printing & DTF.',
-        lastUpdated: new Date().toISOString()
-    },
-    {
-        id: 'PRD-103',
-        name: 'Matte Self-Adhesive Vinyl Roll (50m x 1.2m)',
-        category: 'Vinyl & Banner Media',
-        quantity: 12,
-        minThreshold: 5,
-        unit: 'rolls',
-        status: 'In Stock',
-        image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80',
-        supplier: 'SignMedia Co',
-        description: 'Premium outdoor matte adhesive vinyl roll for wide format signage.',
-        lastUpdated: new Date().toISOString()
-    },
-    {
-        id: 'PRD-104',
-        name: 'Cyan Sublimation Ink Bottle 1000ml',
-        category: 'Inks & Toners',
-        quantity: 0,
-        minThreshold: 3,
-        unit: 'bottles',
-        status: 'Out of Stock',
-        image: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=300&auto=format&fit=crop&q=80',
-        supplier: 'ChromaTech Inks',
-        description: 'Vibrant cyan heat transfer sublimation ink for Epson printheads.',
-        lastUpdated: new Date().toISOString()
-    },
-    {
-        id: 'PRD-105',
-        name: 'Corrugated Shipping Box (10x8x6 inch, Bundle of 25)',
-        category: 'Packaging & Boxes',
-        quantity: 30,
-        minThreshold: 8,
-        unit: 'bundles',
-        status: 'In Stock',
-        image: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=300&auto=format&fit=crop&q=80',
-        supplier: 'PackRight Solutions',
-        description: '3-ply heavy duty corrugated cardboard shipping boxes for e-commerce.',
-        lastUpdated: new Date().toISOString()
-    },
-    {
-        id: 'PRD-106',
-        name: 'Ceramic Sublimation White Mug 11oz (Box of 36)',
-        category: 'Merch & Promo Supplies',
-        quantity: 5,
-        minThreshold: 5,
-        unit: 'boxes',
-        status: 'Low Stock',
-        image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=80',
-        supplier: 'PromoWare Global',
-        description: 'JS-coated AAA grade sublimation white blank ceramic coffee mugs.',
-        lastUpdated: new Date().toISOString()
-    }
-];
-export const DEFAULT_HISTORY = [
-    {
-        id: 'LOG-1001',
-        productId: 'PRD-101',
-        productName: 'Glossy Photo Paper 250gsm (A4, Pack of 100)',
-        category: 'Paper & Media',
-        type: 'create',
-        changeQty: 45,
-        previousQty: 0,
-        newQty: 45,
-        unit: 'packs',
-        timestamp: new Date().toISOString(),
-        note: 'Initial inventory stock load'
-    },
-    {
-        id: 'LOG-1002',
-        productId: 'PRD-102',
-        productName: 'Heavy Cotton Round Neck T-Shirt (White - L)',
-        category: 'Apparel & Fabrics',
-        type: 'minus',
-        changeQty: -12,
-        previousQty: 20,
-        newQty: 8,
-        unit: 'pcs',
-        timestamp: new Date().toISOString(),
-        note: 'Fulfilling Bulk Print Order #PR-8820'
-    }
-];
 let store = {
-    isInitialized: false,
-    categories: [...DEFAULT_CATEGORIES],
-    products: [...DEFAULT_PRODUCTS],
-    historyLogs: [...DEFAULT_HISTORY]
+    categories: [],
+    products: [],
+    historyLogs: []
 };
-// Load data from JSON file or seed if empty
+// Load stored local data (offline fallback)
 export function loadData() {
     try {
         if (fs.existsSync(DATA_FILE)) {
             const fileData = fs.readFileSync(DATA_FILE, 'utf-8');
             const parsed = JSON.parse(fileData);
-            const isInitialized = Boolean(parsed.isInitialized);
-            const loadedCats = Array.isArray(parsed.categories)
-                ? (parsed.categories.length === 0 && !isInitialized ? DEFAULT_CATEGORIES : parsed.categories)
-                : DEFAULT_CATEGORIES;
-            const loadedProds = Array.isArray(parsed.products)
-                ? (parsed.products.length === 0 && !isInitialized ? DEFAULT_PRODUCTS : parsed.products)
-                : DEFAULT_PRODUCTS;
-            const loadedLogs = Array.isArray(parsed.historyLogs)
-                ? (parsed.historyLogs.length === 0 && !isInitialized ? DEFAULT_HISTORY : parsed.historyLogs)
-                : DEFAULT_HISTORY;
             store = {
-                isInitialized: true,
-                categories: loadedCats,
-                products: loadedProds,
-                historyLogs: loadedLogs
+                categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+                products: Array.isArray(parsed.products) ? parsed.products : [],
+                historyLogs: Array.isArray(parsed.historyLogs) ? parsed.historyLogs : []
             };
-            if (!isInitialized) {
-                saveData();
-            }
-        }
-        else {
-            store.isInitialized = true;
-            saveData();
         }
     }
     catch (err) {
-        console.error('Error loading backend data:', err);
+        console.error('Error loading local data.json:', err);
     }
 }
-// Save data to JSON file
+// Save data to local JSON file
 export function saveData() {
     try {
         fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2), 'utf-8');
     }
     catch (err) {
-        console.error('Error saving backend data:', err);
+        console.error('Error saving local data.json:', err);
     }
 }
-// Synchronize memory store with MongoDB Atlas if connected
+// Synchronize memory store directly from MongoDB Atlas Cloud Database
 export async function syncWithMongoDB() {
     if (mongoose.connection.readyState !== 1)
         return;
     try {
-        // 1. Sync Categories
+        // 1. Categories
         const mongoCats = await CategoryModel.find().lean();
-        if (mongoCats.length === 0 && (!store.categories || store.categories.length === 0)) {
-            store.categories = [...DEFAULT_CATEGORIES];
-            await CategoryModel.insertMany(store.categories.map(name => ({ name })));
-        }
-        else if (mongoCats.length === 0 && store.categories.length > 0) {
-            await CategoryModel.insertMany(store.categories.map(name => ({ name })));
-        }
-        else {
-            store.categories = mongoCats.map(c => c.name);
-        }
-        // 2. Sync Products
+        store.categories = mongoCats.map(c => c.name);
+        // 2. Products
         const mongoProds = await ProductModel.find().lean();
-        if (mongoProds.length === 0 && (!store.products || store.products.length === 0)) {
-            store.products = [...DEFAULT_PRODUCTS];
-            await ProductModel.insertMany(store.products);
+        store.products = mongoProds.map(p => ({
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            quantity: p.quantity,
+            minThreshold: p.minThreshold,
+            unit: p.unit,
+            status: p.status,
+            image: p.image,
+            supplier: p.supplier,
+            description: p.description,
+            lastUpdated: p.lastUpdated
+        }));
+        // 3. History
+        const mongoLogs = await HistoryModel.find().sort({ createdAt: -1 }).lean();
+        store.historyLogs = mongoLogs.map(l => ({
+            id: l.id,
+            productId: l.productId,
+            productName: l.productName,
+            category: l.category,
+            type: l.type,
+            changeQty: l.changeQty,
+            previousQty: l.previousQty,
+            newQty: l.newQty,
+            unit: l.unit,
+            timestamp: l.timestamp,
+            note: l.note
+        }));
+        saveData();
+    }
+    catch (err) {
+        console.error('Error syncing with MongoDB Atlas:', err);
+    }
+}
+// Fetch Categories - Direct live query from MongoDB Atlas when connected
+export async function getCategories() {
+    if (mongoose.connection.readyState === 1) {
+        try {
+            const mongoCats = await CategoryModel.find().lean();
+            const cats = mongoCats.map(c => c.name);
+            store.categories = cats;
+            return cats;
         }
-        else if (mongoProds.length === 0 && store.products.length > 0) {
-            await ProductModel.insertMany(store.products);
+        catch (e) {
+            console.error('Error fetching categories from MongoDB:', e);
         }
-        else {
-            store.products = mongoProds.map(p => ({
+    }
+    loadData();
+    return store.categories || [];
+}
+export async function setCategories(categories) {
+    store.categories = categories;
+    saveData();
+    if (mongoose.connection.readyState === 1) {
+        try {
+            await CategoryModel.deleteMany({});
+            if (categories.length > 0) {
+                await CategoryModel.insertMany(categories.map(name => ({ name })));
+            }
+        }
+        catch (e) {
+            console.error('Error updating categories in MongoDB:', e);
+        }
+    }
+    return store.categories;
+}
+// Fetch Products - Direct live query from MongoDB Atlas when connected
+export async function getProducts() {
+    if (mongoose.connection.readyState === 1) {
+        try {
+            const mongoProds = await ProductModel.find().lean();
+            const prods = mongoProds.map(p => ({
                 id: p.id,
                 name: p.name,
                 category: p.category,
@@ -214,18 +133,38 @@ export async function syncWithMongoDB() {
                 description: p.description,
                 lastUpdated: p.lastUpdated
             }));
+            store.products = prods;
+            return prods;
         }
-        // 3. Sync History
-        const mongoLogs = await HistoryModel.find().sort({ createdAt: -1 }).lean();
-        if (mongoLogs.length === 0 && (!store.historyLogs || store.historyLogs.length === 0)) {
-            store.historyLogs = [...DEFAULT_HISTORY];
-            await HistoryModel.insertMany(store.historyLogs);
+        catch (e) {
+            console.error('Error fetching products from MongoDB:', e);
         }
-        else if (mongoLogs.length === 0 && store.historyLogs.length > 0) {
-            await HistoryModel.insertMany(store.historyLogs);
+    }
+    loadData();
+    return store.products || [];
+}
+export async function setProducts(products) {
+    store.products = products;
+    saveData();
+    if (mongoose.connection.readyState === 1) {
+        try {
+            await ProductModel.deleteMany({});
+            if (products.length > 0) {
+                await ProductModel.insertMany(products);
+            }
         }
-        else {
-            store.historyLogs = mongoLogs.map(l => ({
+        catch (e) {
+            console.error('Error updating products in MongoDB:', e);
+        }
+    }
+    return store.products;
+}
+// Fetch History Logs - Direct live query from MongoDB Atlas when connected
+export async function getHistoryLogs() {
+    if (mongoose.connection.readyState === 1) {
+        try {
+            const mongoLogs = await HistoryModel.find().sort({ createdAt: -1 }).lean();
+            const logs = mongoLogs.map(l => ({
                 id: l.id,
                 productId: l.productId,
                 productName: l.productName,
@@ -238,58 +177,29 @@ export async function syncWithMongoDB() {
                 timestamp: l.timestamp,
                 note: l.note
             }));
+            store.historyLogs = logs;
+            return logs;
         }
-        saveData();
+        catch (e) {
+            console.error('Error fetching history logs from MongoDB:', e);
+        }
     }
-    catch (err) {
-        console.error('Error syncing with MongoDB Atlas:', err);
-    }
-}
-export function getCategories() {
-    loadData();
-    return store.categories || [];
-}
-export function setCategories(categories) {
-    store.categories = categories;
-    saveData();
-    if (mongoose.connection.readyState === 1) {
-        CategoryModel.deleteMany({}).then(() => {
-            if (categories.length > 0) {
-                CategoryModel.insertMany(categories.map(name => ({ name }))).catch(console.error);
-            }
-        }).catch(console.error);
-    }
-    return store.categories;
-}
-export function getProducts() {
-    loadData();
-    return store.products || [];
-}
-export function setProducts(products) {
-    store.products = products;
-    saveData();
-    if (mongoose.connection.readyState === 1) {
-        ProductModel.deleteMany({}).then(() => {
-            if (products.length > 0) {
-                ProductModel.insertMany(products).catch(console.error);
-            }
-        }).catch(console.error);
-    }
-    return store.products;
-}
-export function getHistoryLogs() {
     loadData();
     return store.historyLogs || [];
 }
-export function setHistoryLogs(logs) {
+export async function setHistoryLogs(logs) {
     store.historyLogs = logs;
     saveData();
     if (mongoose.connection.readyState === 1) {
-        HistoryModel.deleteMany({}).then(() => {
+        try {
+            await HistoryModel.deleteMany({});
             if (logs.length > 0) {
-                HistoryModel.insertMany(logs).catch(console.error);
+                await HistoryModel.insertMany(logs);
             }
-        }).catch(console.error);
+        }
+        catch (e) {
+            console.error('Error updating history logs in MongoDB:', e);
+        }
     }
     return store.historyLogs;
 }
