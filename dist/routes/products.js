@@ -8,7 +8,7 @@ function calculateStatus(qty, threshold) {
         return 'Low Stock';
     return 'In Stock';
 }
-function isWithinDateRange(timestampStr, dateRange, startDate, endDate) {
+function isWithinDateRange(timestampStr, dateRange, startDate, endDate, selectedMonth) {
     if (!dateRange || dateRange === 'all')
         return true;
     if (!timestampStr)
@@ -40,6 +40,15 @@ function isWithinDateRange(timestampStr, dateRange, startDate, endDate) {
     if (dateRange === 'this_month') {
         return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
     }
+    if (dateRange === 'specific_month' || (selectedMonth && /^\d{4}-\d{2}$/.test(selectedMonth))) {
+        const targetMonthStr = selectedMonth || (dateRange.includes('-') ? dateRange : '');
+        if (targetMonthStr && /^\d{4}-\d{2}$/.test(targetMonthStr)) {
+            const [yearStr, monthStr] = targetMonthStr.split('-');
+            const targetYear = parseInt(yearStr, 10);
+            const targetMonth = parseInt(monthStr, 10) - 1;
+            return itemDate.getFullYear() === targetYear && itemDate.getMonth() === targetMonth;
+        }
+    }
     if (dateRange === 'custom') {
         if (startDate) {
             const s = new Date(startDate);
@@ -59,13 +68,13 @@ function isWithinDateRange(timestampStr, dateRange, startDate, endDate) {
 }
 // GET all products with optional date query parameters
 router.get('/', (req, res) => {
-    const { dateRange, startDate, endDate } = req.query;
+    const { dateRange, startDate, endDate, selectedMonth } = req.query;
     const products = getProducts();
     if (!dateRange || dateRange === 'all') {
         res.json(products);
         return;
     }
-    const filtered = products.filter(p => isWithinDateRange(p.lastUpdated, String(dateRange), startDate ? String(startDate) : undefined, endDate ? String(endDate) : undefined));
+    const filtered = products.filter(p => isWithinDateRange(p.lastUpdated, String(dateRange), startDate ? String(startDate) : undefined, endDate ? String(endDate) : undefined, selectedMonth ? String(selectedMonth) : undefined));
     res.json(filtered);
 });
 // POST create product

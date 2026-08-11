@@ -10,7 +10,7 @@ function calculateStatus(qty: number, threshold: number): StockStatus {
   return 'In Stock';
 }
 
-function isWithinDateRange(timestampStr: string, dateRange?: string, startDate?: string, endDate?: string): boolean {
+function isWithinDateRange(timestampStr: string, dateRange?: string, startDate?: string, endDate?: string, selectedMonth?: string): boolean {
   if (!dateRange || dateRange === 'all') return true;
   if (!timestampStr) return false;
   const itemDate = new Date(timestampStr);
@@ -40,6 +40,15 @@ function isWithinDateRange(timestampStr: string, dateRange?: string, startDate?:
   if (dateRange === 'this_month') {
     return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
   }
+  if (dateRange === 'specific_month' || (selectedMonth && /^\d{4}-\d{2}$/.test(selectedMonth))) {
+    const targetMonthStr = selectedMonth || (dateRange.includes('-') ? dateRange : '');
+    if (targetMonthStr && /^\d{4}-\d{2}$/.test(targetMonthStr)) {
+      const [yearStr, monthStr] = targetMonthStr.split('-');
+      const targetYear = parseInt(yearStr, 10);
+      const targetMonth = parseInt(monthStr, 10) - 1;
+      return itemDate.getFullYear() === targetYear && itemDate.getMonth() === targetMonth;
+    }
+  }
   if (dateRange === 'custom') {
     if (startDate) {
       const s = new Date(startDate);
@@ -58,7 +67,7 @@ function isWithinDateRange(timestampStr: string, dateRange?: string, startDate?:
 
 // GET history logs with optional date range query params
 router.get('/', (req: Request, res: Response) => {
-  const { dateRange, startDate, endDate } = req.query;
+  const { dateRange, startDate, endDate, selectedMonth } = req.query;
   const logs = getHistoryLogs();
   
   if (!dateRange || dateRange === 'all') {
@@ -67,7 +76,13 @@ router.get('/', (req: Request, res: Response) => {
   }
 
   const filtered = logs.filter(log =>
-    isWithinDateRange(log.timestamp, String(dateRange), startDate ? String(startDate) : undefined, endDate ? String(endDate) : undefined)
+    isWithinDateRange(
+      log.timestamp,
+      String(dateRange),
+      startDate ? String(startDate) : undefined,
+      endDate ? String(endDate) : undefined,
+      selectedMonth ? String(selectedMonth) : undefined
+    )
   );
   res.json(filtered);
 });

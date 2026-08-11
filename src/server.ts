@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import { loadData } from './data.js';
+import { loadData, syncWithMongoDB } from './data.js';
 import productsRouter from './routes/products.js';
 import categoriesRouter from './routes/categories.js';
 import historyRouter from './routes/history.js';
@@ -20,7 +20,10 @@ const MONGODB_URI = process.env.MONGODB_URI;
 if (MONGODB_URI) {
   mongoose
     .connect(MONGODB_URI)
-    .then(() => console.log('🍃 Connected to MongoDB Atlas Cloud Database'))
+    .then(async () => {
+      console.log('🍃 Connected to MongoDB Atlas Cloud Database');
+      await syncWithMongoDB();
+    })
     .catch((err) => console.error('⚠️ MongoDB Atlas Connection Error:', err.message));
 }
 
