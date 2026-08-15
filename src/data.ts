@@ -11,93 +11,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_FILE = path.join(__dirname, '../data.json');
 
-const DEFAULT_CATEGORIES: string[] = [
-  'Paper & Media',
-  'Substrates & Boards',
-  'Inks & Toners',
-  'Display & Signage',
-  'Apparel & Merch',
-  'Finishing & Accessories'
-];
+const DEFAULT_CATEGORIES: string[] = [];
 
-const DEFAULT_PRODUCTS: InventoryItem[] = [
-  {
-    id: 'PRD-101',
-    name: 'A4 Glossy Photo Paper (250gsm)',
-    category: 'Paper & Media',
-    quantity: 150,
-    minThreshold: 20,
-    unit: 'packs',
-    status: 'In Stock',
-    image: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300&auto=format&fit=crop&q=80',
-    supplier: 'Printo Paper Supplies',
-    description: 'Premium glossy photo paper for high-definition color printing.',
-    lastUpdated: new Date().toISOString()
-  },
-  {
-    id: 'PRD-102',
-    name: 'Matte Vinyl Sticker Roll (50m)',
-    category: 'Paper & Media',
-    quantity: 8,
-    minThreshold: 10,
-    unit: 'rolls',
-    status: 'Low Stock',
-    image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80',
-    supplier: 'VinylTech Ltd',
-    description: 'Waterproof matte vinyl roll for decal and sticker production.',
-    lastUpdated: new Date().toISOString()
-  },
-  {
-    id: 'PRD-103',
-    name: '3mm PVC Foam Board (4x8 ft)',
-    category: 'Substrates & Boards',
-    quantity: 45,
-    minThreshold: 15,
-    unit: 'sheets',
-    status: 'In Stock',
-    supplier: 'BoardMaster Inc',
-    description: 'Rigid lightweight PVC board for outdoor signage and display boards.',
-    lastUpdated: new Date().toISOString()
-  },
-  {
-    id: 'PRD-104',
-    name: 'Eco-Solvent Black Ink Bottle (1L)',
-    category: 'Inks & Toners',
-    quantity: 0,
-    minThreshold: 5,
-    unit: 'bottles',
-    status: 'Out of Stock',
-    image: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=300&auto=format&fit=crop&q=80',
-    supplier: 'InkJet Global',
-    description: 'High-durability eco-solvent black ink for large format printers.',
-    lastUpdated: new Date().toISOString()
-  },
-  {
-    id: 'PRD-105',
-    name: 'Roll-Up Banner Stand (85x200cm)',
-    category: 'Display & Signage',
-    quantity: 25,
-    minThreshold: 5,
-    unit: 'pcs',
-    status: 'In Stock',
-    supplier: 'Display Express',
-    description: 'Heavy-duty aluminum retractable stand with carrying bag.',
-    lastUpdated: new Date().toISOString()
-  },
-  {
-    id: 'PRD-106',
-    name: 'White Cotton Crewneck T-Shirt (L)',
-    category: 'Apparel & Merch',
-    quantity: 60,
-    minThreshold: 20,
-    unit: 'pcs',
-    status: 'In Stock',
-    image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300&auto=format&fit=crop&q=80',
-    supplier: 'TexStyle Clothing',
-    description: '100% combed cotton blank t-shirts for DTF and screen printing.',
-    lastUpdated: new Date().toISOString()
-  }
-];
+const DEFAULT_PRODUCTS: InventoryItem[] = [];
 
 interface StoreData {
   categories: string[];
@@ -106,8 +22,8 @@ interface StoreData {
 }
 
 let store: StoreData = {
-  categories: [...DEFAULT_CATEGORIES],
-  products: [...DEFAULT_PRODUCTS],
+  categories: [],
+  products: [],
   historyLogs: []
 };
 
@@ -118,8 +34,8 @@ export function loadData(): void {
       const fileData = fs.readFileSync(DATA_FILE, 'utf-8');
       const parsed = JSON.parse(fileData);
       store = {
-        categories: Array.isArray(parsed.categories) && parsed.categories.length > 0 ? parsed.categories : [...DEFAULT_CATEGORIES],
-        products: Array.isArray(parsed.products) && parsed.products.length > 0 ? parsed.products : [...DEFAULT_PRODUCTS],
+        categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+        products: Array.isArray(parsed.products) ? parsed.products : [],
         historyLogs: Array.isArray(parsed.historyLogs) ? parsed.historyLogs : []
       };
     } else {
@@ -145,21 +61,11 @@ export async function syncWithMongoDB(): Promise<void> {
 
   try {
     // 1. Categories
-    let mongoCats = await CategoryModel.find().lean();
-    if (mongoCats.length === 0) {
-      const catToInsert = store.categories.length > 0 ? store.categories : DEFAULT_CATEGORIES;
-      await CategoryModel.insertMany(catToInsert.map(name => ({ name })));
-      mongoCats = await CategoryModel.find().lean();
-    }
+    const mongoCats = await CategoryModel.find().lean();
     store.categories = mongoCats.map(c => c.name);
 
     // 2. Products
-    let mongoProds = await ProductModel.find().lean();
-    if (mongoProds.length === 0) {
-      const prodToInsert = store.products.length > 0 ? store.products : DEFAULT_PRODUCTS;
-      await ProductModel.insertMany(prodToInsert);
-      mongoProds = await ProductModel.find().lean();
-    }
+    const mongoProds = await ProductModel.find().lean();
     store.products = mongoProds.map(p => ({
       id: p.id,
       name: p.name,
@@ -200,12 +106,7 @@ export async function syncWithMongoDB(): Promise<void> {
 export async function getCategories(): Promise<string[]> {
   if (mongoose.connection.readyState === 1) {
     try {
-      let mongoCats = await CategoryModel.find().lean();
-      if (mongoCats.length === 0) {
-        const catToInsert = store.categories.length > 0 ? store.categories : DEFAULT_CATEGORIES;
-        await CategoryModel.insertMany(catToInsert.map(name => ({ name })));
-        mongoCats = await CategoryModel.find().lean();
-      }
+      const mongoCats = await CategoryModel.find().lean();
       const cats = mongoCats.map(c => c.name);
       store.categories = cats;
       return cats;
@@ -214,7 +115,7 @@ export async function getCategories(): Promise<string[]> {
     }
   }
   loadData();
-  return store.categories.length > 0 ? store.categories : [...DEFAULT_CATEGORIES];
+  return store.categories;
 }
 
 export async function setCategories(categories: string[]): Promise<string[]> {
@@ -237,12 +138,7 @@ export async function setCategories(categories: string[]): Promise<string[]> {
 export async function getProducts(): Promise<InventoryItem[]> {
   if (mongoose.connection.readyState === 1) {
     try {
-      let mongoProds = await ProductModel.find().lean();
-      if (mongoProds.length === 0) {
-        const prodToInsert = store.products.length > 0 ? store.products : DEFAULT_PRODUCTS;
-        await ProductModel.insertMany(prodToInsert);
-        mongoProds = await ProductModel.find().lean();
-      }
+      const mongoProds = await ProductModel.find().lean();
       const prods: InventoryItem[] = mongoProds.map(p => ({
         id: p.id,
         name: p.name,
@@ -263,7 +159,7 @@ export async function getProducts(): Promise<InventoryItem[]> {
     }
   }
   loadData();
-  return store.products.length > 0 ? store.products : [...DEFAULT_PRODUCTS];
+  return store.products;
 }
 
 export async function setProducts(products: InventoryItem[]): Promise<InventoryItem[]> {
