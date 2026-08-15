@@ -24,7 +24,12 @@ if (MONGODB_URI) {
       console.log('🍃 Connected to MongoDB Atlas Cloud Database');
       await syncWithMongoDB();
     })
-    .catch((err) => console.error('⚠️ MongoDB Atlas Connection Error:', err.message));
+    .catch((err) => {
+      console.error('⚠️ MongoDB Atlas Connection Error:', err.message);
+      if (err.message.includes('querySrv') || err.message.includes('ECONNREFUSED')) {
+        console.warn('💡 Tip: Ensure your current IP is whitelisted in MongoDB Atlas Network Access and that your network DNS resolves SRV records.');
+      }
+    });
 }
 
 // Middleware
