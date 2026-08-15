@@ -145,11 +145,21 @@ export async function syncWithMongoDB(): Promise<void> {
 
   try {
     // 1. Categories
-    const mongoCats = await CategoryModel.find().lean();
+    let mongoCats = await CategoryModel.find().lean();
+    if (mongoCats.length === 0) {
+      const catToInsert = store.categories.length > 0 ? store.categories : DEFAULT_CATEGORIES;
+      await CategoryModel.insertMany(catToInsert.map(name => ({ name })));
+      mongoCats = await CategoryModel.find().lean();
+    }
     store.categories = mongoCats.map(c => c.name);
 
     // 2. Products
-    const mongoProds = await ProductModel.find().lean();
+    let mongoProds = await ProductModel.find().lean();
+    if (mongoProds.length === 0) {
+      const prodToInsert = store.products.length > 0 ? store.products : DEFAULT_PRODUCTS;
+      await ProductModel.insertMany(prodToInsert);
+      mongoProds = await ProductModel.find().lean();
+    }
     store.products = mongoProds.map(p => ({
       id: p.id,
       name: p.name,
@@ -190,7 +200,12 @@ export async function syncWithMongoDB(): Promise<void> {
 export async function getCategories(): Promise<string[]> {
   if (mongoose.connection.readyState === 1) {
     try {
-      const mongoCats = await CategoryModel.find().lean();
+      let mongoCats = await CategoryModel.find().lean();
+      if (mongoCats.length === 0) {
+        const catToInsert = store.categories.length > 0 ? store.categories : DEFAULT_CATEGORIES;
+        await CategoryModel.insertMany(catToInsert.map(name => ({ name })));
+        mongoCats = await CategoryModel.find().lean();
+      }
       const cats = mongoCats.map(c => c.name);
       store.categories = cats;
       return cats;
@@ -199,7 +214,7 @@ export async function getCategories(): Promise<string[]> {
     }
   }
   loadData();
-  return store.categories || [];
+  return store.categories.length > 0 ? store.categories : [...DEFAULT_CATEGORIES];
 }
 
 export async function setCategories(categories: string[]): Promise<string[]> {
@@ -222,7 +237,12 @@ export async function setCategories(categories: string[]): Promise<string[]> {
 export async function getProducts(): Promise<InventoryItem[]> {
   if (mongoose.connection.readyState === 1) {
     try {
-      const mongoProds = await ProductModel.find().lean();
+      let mongoProds = await ProductModel.find().lean();
+      if (mongoProds.length === 0) {
+        const prodToInsert = store.products.length > 0 ? store.products : DEFAULT_PRODUCTS;
+        await ProductModel.insertMany(prodToInsert);
+        mongoProds = await ProductModel.find().lean();
+      }
       const prods: InventoryItem[] = mongoProds.map(p => ({
         id: p.id,
         name: p.name,
@@ -243,7 +263,7 @@ export async function getProducts(): Promise<InventoryItem[]> {
     }
   }
   loadData();
-  return store.products || [];
+  return store.products.length > 0 ? store.products : [...DEFAULT_PRODUCTS];
 }
 
 export async function setProducts(products: InventoryItem[]): Promise<InventoryItem[]> {
