@@ -100,7 +100,7 @@ router.post('/', async (req: Request, res: Response) => {
   const threshold = Number(minThreshold) || 5;
 
   const newItem: InventoryItem = {
-    id: `PRD-${Date.now()}`,
+    id: `PRD-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     name,
     category,
     quantity: qty,
@@ -119,7 +119,7 @@ router.post('/', async (req: Request, res: Response) => {
   // Add history log
   const logs = await getHistoryLogs();
   const newLog: StockHistoryLog = {
-    id: `LOG-${Date.now()}`,
+    id: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     productId: newItem.id,
     productName: newItem.name,
     category: newItem.category,
