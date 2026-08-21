@@ -34,24 +34,33 @@ function dedupeCategories(cats) {
     return result;
 }
 function dedupeProducts(prods) {
-    const map = new Map();
+    const idMap = new Map();
+    const nameMap = new Map();
     for (const p of prods) {
-        if (!p || !p.id)
+        if (!p || !p.name)
             continue;
-        const existing = map.get(p.id);
+        const normName = p.name.trim().toLowerCase();
+        const existingById = p.id ? idMap.get(p.id) : undefined;
+        const existingByName = nameMap.get(normName);
+        const existing = existingById || existingByName;
         if (!existing) {
-            map.set(p.id, p);
+            if (p.id)
+                idMap.set(p.id, p);
+            nameMap.set(normName, p);
         }
         else {
-            // Keep the one with the latest lastUpdated timestamp
             const existingTime = new Date(existing.lastUpdated || 0).getTime();
             const newTime = new Date(p.lastUpdated || 0).getTime();
             if (newTime >= existingTime) {
-                map.set(p.id, p);
+                if (existing.id)
+                    idMap.delete(existing.id);
+                if (p.id)
+                    idMap.set(p.id, p);
+                nameMap.set(normName, p);
             }
         }
     }
-    return Array.from(map.values());
+    return Array.from(nameMap.values());
 }
 function dedupeHistoryLogs(logs) {
     const map = new Map();

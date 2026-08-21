@@ -89,18 +89,45 @@ router.get('/', async (req: Request, res: Response) => {
 
 // POST create product
 router.post('/', async (req: Request, res: Response) => {
-  const { name, category, quantity, minThreshold, unit, image, supplier, description } = req.body;
+  const { id, name, category, quantity, minThreshold, unit, image, supplier, description } = req.body;
   if (!name || !category) {
     res.status(400).json({ error: 'Name and category are required' });
     return;
   }
 
   const products = await getProducts();
+  const trimmedName = String(name).trim().toLowerCase();
+
+  const existingIndex = products.findIndex(
+    p => (id && p.id === id) || p.name.trim().toLowerCase() === trimmedName
+  );
+
   const qty = Number(quantity) || 0;
   const threshold = Number(minThreshold) || 5;
 
+  if (existingIndex !== -1) {
+    const existing = products[existingIndex];
+    const updatedItem: InventoryItem = {
+      ...existing,
+      name: name ?? existing.name,
+      category: category ?? existing.category,
+      quantity: qty,
+      minThreshold: threshold,
+      unit: unit ?? existing.unit,
+      status: calculateStatus(qty, threshold),
+      image: image ?? existing.image,
+      supplier: supplier ?? existing.supplier,
+      description: description ?? existing.description,
+      lastUpdated: new Date().toISOString()
+    };
+    products[existingIndex] = updatedItem;
+    await setProducts(products);
+    res.status(200).json(updatedItem);
+    return;
+  }
+
   const newItem: InventoryItem = {
-    id: `PRD-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: id || `PRD-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     name,
     category,
     quantity: qty,
@@ -208,7 +235,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
   );
 
   if (index === -1) {
-    res.status(404).json({ error: `Product "${targetId}" not found in inventory` });
+    res.json({ message: `Product "${targetId}" was already deleted or not found`, id: targetId });
     return;
   }
 

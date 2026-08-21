@@ -45,22 +45,30 @@ function dedupeCategories(cats: string[]): string[] {
 }
 
 function dedupeProducts(prods: InventoryItem[]): InventoryItem[] {
-  const map = new Map<string, InventoryItem>();
+  const idMap = new Map<string, InventoryItem>();
+  const nameMap = new Map<string, InventoryItem>();
+
   for (const p of prods) {
-    if (!p || !p.id) continue;
-    const existing = map.get(p.id);
+    if (!p || !p.name) continue;
+    const normName = p.name.trim().toLowerCase();
+    const existingById = p.id ? idMap.get(p.id) : undefined;
+    const existingByName = nameMap.get(normName);
+    const existing = existingById || existingByName;
+
     if (!existing) {
-      map.set(p.id, p);
+      if (p.id) idMap.set(p.id, p);
+      nameMap.set(normName, p);
     } else {
-      // Keep the one with the latest lastUpdated timestamp
       const existingTime = new Date(existing.lastUpdated || 0).getTime();
       const newTime = new Date(p.lastUpdated || 0).getTime();
       if (newTime >= existingTime) {
-        map.set(p.id, p);
+        if (existing.id) idMap.delete(existing.id);
+        if (p.id) idMap.set(p.id, p);
+        nameMap.set(normName, p);
       }
     }
   }
-  return Array.from(map.values());
+  return Array.from(nameMap.values());
 }
 
 function dedupeHistoryLogs(logs: StockHistoryLog[]): StockHistoryLog[] {
