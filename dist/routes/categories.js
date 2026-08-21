@@ -28,10 +28,6 @@ router.delete('/:name', async (req, res) => {
     const targetName = decodeURIComponent(req.params.name).trim().toLowerCase();
     const categories = await getCategories();
     const filtered = categories.filter(c => c.trim().toLowerCase() !== targetName);
-    if (filtered.length === categories.length) {
-        res.status(404).json({ error: 'Category not found' });
-        return;
-    }
     await setCategories(filtered);
     res.json(filtered);
 });
