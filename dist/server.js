@@ -44,6 +44,21 @@ app.use(express.json());
 app.use('/api/products', productsRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/history', historyRouter);
+// Root endpoint welcome & status message
+app.get('/', (_req, res) => {
+    res.json({
+        status: 'ok',
+        service: 'Printo Store Management Backend API',
+        message: 'Backend server is live and operational.',
+        endpoints: {
+            health: '/api/health',
+            products: '/api/products',
+            categories: '/api/categories',
+            history: '/api/history'
+        },
+        db: mongoose.connection.readyState === 1 ? 'MongoDB Atlas' : 'Local JSON Store'
+    });
+});
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
     res.json({

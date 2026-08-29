@@ -14,58 +14,11 @@ catch (e) { }
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_FILE = path.join(__dirname, '../data.json');
-const DEFAULT_CATEGORIES = [
-    'Paper & Media',
-    'Apparel',
-    'Vinyl & Signage',
-    'Ink & Toners',
-    'Merchandise',
-    'Packaging'
-];
-const DEFAULT_PRODUCTS = [
-    {
-        id: 'PRD-001',
-        name: '300 GSM Glossy Card Stock (A4)',
-        category: 'Paper & Media',
-        quantity: 450,
-        minThreshold: 100,
-        unit: 'sheets',
-        status: 'In Stock',
-        image: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300&auto=format&fit=crop&q=80',
-        supplier: 'PaperCo Ltd',
-        description: 'Premium heavyweight glossy paper for business card printing.',
-        lastUpdated: new Date().toISOString()
-    },
-    {
-        id: 'PRD-002',
-        name: 'Cotton Heavyweight T-Shirt (Black, L)',
-        category: 'Apparel',
-        quantity: 18,
-        minThreshold: 25,
-        unit: 'pcs',
-        status: 'Low Stock',
-        image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300&auto=format&fit=crop&q=80',
-        supplier: 'Textile Hub',
-        description: '100% combed cotton blank t-shirts for screen printing.',
-        lastUpdated: new Date().toISOString()
-    },
-    {
-        id: 'PRD-003',
-        name: 'Matte Vinyl Roll (50m x 1.2m)',
-        category: 'Vinyl & Signage',
-        quantity: 12,
-        minThreshold: 5,
-        unit: 'rolls',
-        status: 'In Stock',
-        image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80',
-        supplier: 'SignCraft Supplies',
-        description: 'High durability outdoor adhesive vinyl roll.',
-        lastUpdated: new Date().toISOString()
-    }
-];
+const DEFAULT_CATEGORIES = [];
+const DEFAULT_PRODUCTS = [];
 let store = {
-    categories: DEFAULT_CATEGORIES,
-    products: DEFAULT_PRODUCTS,
+    categories: [],
+    products: [],
     historyLogs: []
 };
 // Helper functions for deduplication
@@ -134,8 +87,8 @@ export function loadData() {
             const parsedProds = Array.isArray(parsed.products) ? dedupeProducts(parsed.products) : [];
             const parsedLogs = Array.isArray(parsed.historyLogs) ? dedupeHistoryLogs(parsed.historyLogs) : [];
             store = {
-                categories: parsedCats.length > 0 ? parsedCats : DEFAULT_CATEGORIES,
-                products: parsedProds.length > 0 ? parsedProds : DEFAULT_PRODUCTS,
+                categories: parsedCats,
+                products: parsedProds,
                 historyLogs: parsedLogs
             };
         }
@@ -156,29 +109,17 @@ export function saveData() {
         console.error('Error saving local data.json:', err);
     }
 }
-// Synchronize memory store directly from MongoDB Atlas Cloud Database (Non-destructive Bi-directional Sync)
+// Synchronize memory store directly from MongoDB Atlas Cloud Database
 export async function syncWithMongoDB() {
     if (mongoose.connection.readyState !== 1)
         return;
     try {
-        loadData(); // Ensure local file data is loaded first
-        // 1. Categories Sync
+        // 1. Categories Sync from MongoDB
         const mongoCats = await CategoryModel.find().lean();
-        const mongoCatNames = mongoCats.map(c => c.name);
-        if (mongoCatNames.length === 0 && store.categories.length > 0) {
-            await CategoryModel.insertMany(store.categories.map(name => ({ name })));
-        }
-        else {
-            const mergedCats = dedupeCategories([...mongoCatNames, ...store.categories]);
-            store.categories = mergedCats;
-            if (mongoCatNames.length < mergedCats.length) {
-                await CategoryModel.deleteMany({});
-                await CategoryModel.insertMany(mergedCats.map(name => ({ name })));
-            }
-        }
-        // 2. Products Sync
+        store.categories = dedupeCategories(mongoCats.map(c => c.name));
+        // 2. Products Sync from MongoDB
         const mongoProds = await ProductModel.find().lean();
-        const mongoProdItems = mongoProds.map(p => ({
+        store.products = mongoProds.map(p => ({
             id: p.id,
             name: p.name,
             category: p.category,
@@ -191,20 +132,9 @@ export async function syncWithMongoDB() {
             description: p.description,
             lastUpdated: p.lastUpdated
         }));
-        if (mongoProdItems.length === 0 && store.products.length > 0) {
-            await ProductModel.insertMany(store.products);
-        }
-        else {
-            const mergedProducts = dedupeProducts([...mongoProdItems, ...store.products]);
-            store.products = mergedProducts;
-            if (mongoProdItems.length < mergedProducts.length) {
-                await ProductModel.deleteMany({});
-                await ProductModel.insertMany(mergedProducts);
-            }
-        }
-        // 3. History Logs Sync
+        // 3. History Logs Sync from MongoDB
         const mongoLogs = await HistoryModel.find().sort({ createdAt: -1 }).lean();
-        const mongoLogItems = mongoLogs.map(l => ({
+        store.historyLogs = mongoLogs.map(l => ({
             id: l.id,
             productId: l.productId,
             productName: l.productName,
@@ -217,44 +147,26 @@ export async function syncWithMongoDB() {
             timestamp: l.timestamp,
             note: l.note
         }));
-        if (mongoLogItems.length === 0 && store.historyLogs.length > 0) {
-            await HistoryModel.insertMany(store.historyLogs);
-        }
-        else {
-            const mergedLogs = dedupeHistoryLogs([...mongoLogItems, ...store.historyLogs]);
-            mergedLogs.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
-            store.historyLogs = mergedLogs;
-            if (mongoLogItems.length < mergedLogs.length) {
-                await HistoryModel.deleteMany({});
-                await HistoryModel.insertMany(mergedLogs);
-            }
-        }
         saveData();
     }
     catch (err) {
         console.error('Error syncing with MongoDB Atlas:', err);
     }
 }
-// Fetch Categories - Live query from MongoDB Atlas when connected, with store sync
+// Fetch Categories - Live query from MongoDB Atlas when connected
 export async function getCategories() {
-    loadData();
     if (mongoose.connection.readyState === 1) {
         try {
             const mongoCats = await CategoryModel.find().lean();
-            const mongoCatNames = mongoCats.map(c => c.name);
-            if (mongoCatNames.length > 0) {
-                store.categories = dedupeCategories([...mongoCatNames, ...store.categories]);
-                saveData();
-            }
-            else if (store.categories.length > 0) {
-                await CategoryModel.insertMany(store.categories.map(name => ({ name })));
-            }
+            store.categories = dedupeCategories(mongoCats.map(c => c.name));
+            saveData();
             return store.categories;
         }
         catch (e) {
             console.error('Error fetching categories from MongoDB:', e);
         }
     }
+    loadData();
     return store.categories;
 }
 export async function setCategories(categories) {
@@ -274,38 +186,32 @@ export async function setCategories(categories) {
     }
     return store.categories;
 }
-// Fetch Products - Live query from MongoDB Atlas when connected, with store sync
+// Fetch Products - Live query from MongoDB Atlas when connected
 export async function getProducts() {
-    loadData();
     if (mongoose.connection.readyState === 1) {
         try {
             const mongoProds = await ProductModel.find().lean();
-            if (mongoProds.length > 0) {
-                const mongoProdItems = mongoProds.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    category: p.category,
-                    quantity: p.quantity,
-                    minThreshold: p.minThreshold,
-                    unit: p.unit,
-                    status: p.status,
-                    image: p.image,
-                    supplier: p.supplier,
-                    description: p.description,
-                    lastUpdated: p.lastUpdated
-                }));
-                store.products = dedupeProducts([...mongoProdItems, ...store.products]);
-                saveData();
-            }
-            else if (store.products.length > 0) {
-                await ProductModel.insertMany(store.products);
-            }
+            store.products = mongoProds.map(p => ({
+                id: p.id,
+                name: p.name,
+                category: p.category,
+                quantity: p.quantity,
+                minThreshold: p.minThreshold,
+                unit: p.unit,
+                status: p.status,
+                image: p.image,
+                supplier: p.supplier,
+                description: p.description,
+                lastUpdated: p.lastUpdated
+            }));
+            saveData();
             return store.products;
         }
         catch (e) {
             console.error('Error fetching products from MongoDB:', e);
         }
     }
+    loadData();
     return store.products;
 }
 export async function setProducts(products) {
@@ -325,38 +231,32 @@ export async function setProducts(products) {
     }
     return store.products;
 }
-// Fetch History Logs - Live query from MongoDB Atlas when connected, with store sync
+// Fetch History Logs - Live query from MongoDB Atlas when connected
 export async function getHistoryLogs() {
-    loadData();
     if (mongoose.connection.readyState === 1) {
         try {
             const mongoLogs = await HistoryModel.find().sort({ createdAt: -1 }).lean();
-            if (mongoLogs.length > 0) {
-                const mongoLogItems = mongoLogs.map(l => ({
-                    id: l.id,
-                    productId: l.productId,
-                    productName: l.productName,
-                    category: l.category,
-                    type: l.type,
-                    changeQty: l.changeQty,
-                    previousQty: l.previousQty,
-                    newQty: l.newQty,
-                    unit: l.unit,
-                    timestamp: l.timestamp,
-                    note: l.note
-                }));
-                store.historyLogs = dedupeHistoryLogs([...mongoLogItems, ...store.historyLogs]);
-                saveData();
-            }
-            else if (store.historyLogs.length > 0) {
-                await HistoryModel.insertMany(store.historyLogs);
-            }
+            store.historyLogs = mongoLogs.map(l => ({
+                id: l.id,
+                productId: l.productId,
+                productName: l.productName,
+                category: l.category,
+                type: l.type,
+                changeQty: l.changeQty,
+                previousQty: l.previousQty,
+                newQty: l.newQty,
+                unit: l.unit,
+                timestamp: l.timestamp,
+                note: l.note
+            }));
+            saveData();
             return store.historyLogs || [];
         }
         catch (e) {
             console.error('Error fetching history logs from MongoDB:', e);
         }
     }
+    loadData();
     return store.historyLogs || [];
 }
 export async function setHistoryLogs(logs) {
