@@ -143,9 +143,47 @@ router.post('/adjust', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
   const logs = await getHistoryLogs();
-  const filtered = logs.filter(l => l.id !== id && l.productId !== id);
-  await setHistoryLogs(filtered);
-  res.json(filtered);
+  const targetLogIndex = logs.findIndex(l => l.id === id);
+
+  if (targetLogIndex !== -1) {
+    const targetLog = logs[targetLogIndex];
+    const products = await getProducts();
+    const prodIndex = products.findIndex(
+      p => p.id === targetLog.productId || p.name.trim().toLowerCase() === targetLog.productName.trim().toLowerCase()
+    );
+
+    if (prodIndex !== -1) {
+      const product = products[prodIndex];
+      const changeQty = Number(targetLog.changeQty) || 0;
+
+      // Revert stock shift recorded in history:
+      // If history added stock (add/create or >0), deleting the log minuses/deducts stock.
+      // If history reduced stock (minus or <0), deleting the log adds stock back.
+      let adjustedQty = product.quantity;
+      if (targetLog.type === 'add' || targetLog.type === 'create' || changeQty > 0) {
+        adjustedQty = Math.max(0, product.quantity - Math.abs(changeQty));
+      } else if (targetLog.type === 'minus' || changeQty < 0) {
+        adjustedQty = product.quantity + Math.abs(changeQty);
+      }
+
+      product.quantity = adjustedQty;
+      product.status = calculateStatus(adjustedQty, product.minThreshold);
+      product.lastUpdated = new Date().toISOString();
+      products[prodIndex] = product;
+      await setProducts(products);
+    }
+
+    logs.splice(targetLogIndex, 1);
+    await setHistoryLogs(logs);
+  } else {
+    // Fallback if deleting by product ID
+    const filtered = logs.filter(l => l.id !== id && l.productId !== id);
+    await setHistoryLogs(filtered);
+  }
+
+  const updatedLogs = await getHistoryLogs();
+  const updatedProducts = await getProducts();
+  res.json({ logs: updatedLogs, products: updatedProducts });
 });
 
 // DELETE clear all history logs

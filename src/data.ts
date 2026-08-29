@@ -2,18 +2,71 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
+import dns from 'dns';
 import { InventoryItem, StockHistoryLog } from './types.js';
 import { CategoryModel } from './models/Category.js';
 import { ProductModel } from './models/Product.js';
 import { HistoryModel } from './models/History.js';
 
+// Configure DNS fallback for SRV lookup
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (e) {}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_FILE = path.join(__dirname, '../data.json');
 
-const DEFAULT_CATEGORIES: string[] = [];
+const DEFAULT_CATEGORIES: string[] = [
+  'Paper & Media',
+  'Apparel',
+  'Vinyl & Signage',
+  'Ink & Toners',
+  'Merchandise',
+  'Packaging'
+];
 
-const DEFAULT_PRODUCTS: InventoryItem[] = [];
+const DEFAULT_PRODUCTS: InventoryItem[] = [
+  {
+    id: 'PRD-001',
+    name: '300 GSM Glossy Card Stock (A4)',
+    category: 'Paper & Media',
+    quantity: 450,
+    minThreshold: 100,
+    unit: 'sheets',
+    status: 'In Stock',
+    image: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300&auto=format&fit=crop&q=80',
+    supplier: 'PaperCo Ltd',
+    description: 'Premium heavyweight glossy paper for business card printing.',
+    lastUpdated: new Date().toISOString()
+  },
+  {
+    id: 'PRD-002',
+    name: 'Cotton Heavyweight T-Shirt (Black, L)',
+    category: 'Apparel',
+    quantity: 18,
+    minThreshold: 25,
+    unit: 'pcs',
+    status: 'Low Stock',
+    image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300&auto=format&fit=crop&q=80',
+    supplier: 'Textile Hub',
+    description: '100% combed cotton blank t-shirts for screen printing.',
+    lastUpdated: new Date().toISOString()
+  },
+  {
+    id: 'PRD-003',
+    name: 'Matte Vinyl Roll (50m x 1.2m)',
+    category: 'Vinyl & Signage',
+    quantity: 12,
+    minThreshold: 5,
+    unit: 'rolls',
+    status: 'In Stock',
+    image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80',
+    supplier: 'SignCraft Supplies',
+    description: 'High durability outdoor adhesive vinyl roll.',
+    lastUpdated: new Date().toISOString()
+  }
+];
 
 interface StoreData {
   categories: string[];
@@ -22,8 +75,8 @@ interface StoreData {
 }
 
 let store: StoreData = {
-  categories: [],
-  products: [],
+  categories: DEFAULT_CATEGORIES,
+  products: DEFAULT_PRODUCTS,
   historyLogs: []
 };
 
@@ -86,10 +139,14 @@ export function loadData(): void {
     if (fs.existsSync(DATA_FILE)) {
       const fileData = fs.readFileSync(DATA_FILE, 'utf-8');
       const parsed = JSON.parse(fileData);
+      const parsedCats = Array.isArray(parsed.categories) ? dedupeCategories(parsed.categories) : [];
+      const parsedProds = Array.isArray(parsed.products) ? dedupeProducts(parsed.products) : [];
+      const parsedLogs = Array.isArray(parsed.historyLogs) ? dedupeHistoryLogs(parsed.historyLogs) : [];
+
       store = {
-        categories: Array.isArray(parsed.categories) ? dedupeCategories(parsed.categories) : [],
-        products: Array.isArray(parsed.products) ? dedupeProducts(parsed.products) : [],
-        historyLogs: Array.isArray(parsed.historyLogs) ? dedupeHistoryLogs(parsed.historyLogs) : []
+        categories: parsedCats.length > 0 ? parsedCats : DEFAULT_CATEGORIES,
+        products: parsedProds.length > 0 ? parsedProds : DEFAULT_PRODUCTS,
+        historyLogs: parsedLogs
       };
     } else {
       saveData();
@@ -115,20 +172,22 @@ export async function syncWithMongoDB(): Promise<void> {
   try {
     loadData(); // Ensure local file data is loaded first
 
-    // 1. Categories
+    // 1. Categories Sync
     const mongoCats = await CategoryModel.find().lean();
     const mongoCatNames = mongoCats.map(c => c.name);
-    const mergedCats = dedupeCategories([...mongoCatNames, ...store.categories]);
-    store.categories = mergedCats;
-
-    if (mongoCatNames.length < mergedCats.length) {
-      await CategoryModel.deleteMany({});
-      if (mergedCats.length > 0) {
+    
+    if (mongoCatNames.length === 0 && store.categories.length > 0) {
+      await CategoryModel.insertMany(store.categories.map(name => ({ name })));
+    } else {
+      const mergedCats = dedupeCategories([...mongoCatNames, ...store.categories]);
+      store.categories = mergedCats;
+      if (mongoCatNames.length < mergedCats.length) {
+        await CategoryModel.deleteMany({});
         await CategoryModel.insertMany(mergedCats.map(name => ({ name })));
       }
     }
 
-    // 2. Products
+    // 2. Products Sync
     const mongoProds = await ProductModel.find().lean();
     const mongoProdItems: InventoryItem[] = mongoProds.map(p => ({
       id: p.id,
@@ -144,17 +203,18 @@ export async function syncWithMongoDB(): Promise<void> {
       lastUpdated: p.lastUpdated
     }));
 
-    const mergedProducts = dedupeProducts([...mongoProdItems, ...store.products]);
-    store.products = mergedProducts;
-
-    if (mongoProdItems.length < mergedProducts.length) {
-      await ProductModel.deleteMany({});
-      if (mergedProducts.length > 0) {
+    if (mongoProdItems.length === 0 && store.products.length > 0) {
+      await ProductModel.insertMany(store.products);
+    } else {
+      const mergedProducts = dedupeProducts([...mongoProdItems, ...store.products]);
+      store.products = mergedProducts;
+      if (mongoProdItems.length < mergedProducts.length) {
+        await ProductModel.deleteMany({});
         await ProductModel.insertMany(mergedProducts);
       }
     }
 
-    // 3. History Logs
+    // 3. History Logs Sync
     const mongoLogs = await HistoryModel.find().sort({ createdAt: -1 }).lean();
     const mongoLogItems: StockHistoryLog[] = mongoLogs.map(l => ({
       id: l.id,
@@ -170,13 +230,14 @@ export async function syncWithMongoDB(): Promise<void> {
       note: l.note
     }));
 
-    const mergedLogs = dedupeHistoryLogs([...mongoLogItems, ...store.historyLogs]);
-    mergedLogs.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
-    store.historyLogs = mergedLogs;
-
-    if (mongoLogItems.length < mergedLogs.length) {
-      await HistoryModel.deleteMany({});
-      if (mergedLogs.length > 0) {
+    if (mongoLogItems.length === 0 && store.historyLogs.length > 0) {
+      await HistoryModel.insertMany(store.historyLogs);
+    } else {
+      const mergedLogs = dedupeHistoryLogs([...mongoLogItems, ...store.historyLogs]);
+      mergedLogs.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+      store.historyLogs = mergedLogs;
+      if (mongoLogItems.length < mergedLogs.length) {
+        await HistoryModel.deleteMany({});
         await HistoryModel.insertMany(mergedLogs);
       }
     }
@@ -197,6 +258,8 @@ export async function getCategories(): Promise<string[]> {
       if (mongoCatNames.length > 0) {
         store.categories = dedupeCategories([...mongoCatNames, ...store.categories]);
         saveData();
+      } else if (store.categories.length > 0) {
+        await CategoryModel.insertMany(store.categories.map(name => ({ name })));
       }
       return store.categories;
     } catch (e) {
@@ -245,6 +308,8 @@ export async function getProducts(): Promise<InventoryItem[]> {
         }));
         store.products = dedupeProducts([...mongoProdItems, ...store.products]);
         saveData();
+      } else if (store.products.length > 0) {
+        await ProductModel.insertMany(store.products);
       }
       return store.products;
     } catch (e) {
@@ -293,6 +358,8 @@ export async function getHistoryLogs(): Promise<StockHistoryLog[]> {
         }));
         store.historyLogs = dedupeHistoryLogs([...mongoLogItems, ...store.historyLogs]);
         saveData();
+      } else if (store.historyLogs.length > 0) {
+        await HistoryModel.insertMany(store.historyLogs);
       }
       return store.historyLogs || [];
     } catch (e) {
@@ -318,4 +385,5 @@ export async function setHistoryLogs(logs: StockHistoryLog[]): Promise<StockHist
   }
   return store.historyLogs;
 }
+
 

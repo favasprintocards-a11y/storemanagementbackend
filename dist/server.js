@@ -2,10 +2,18 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+import dns from 'dns';
 import { loadData, syncWithMongoDB } from './data.js';
 import productsRouter from './routes/products.js';
 import categoriesRouter from './routes/categories.js';
 import historyRouter from './routes/history.js';
+// Configure DNS fallback for MongoDB Atlas SRV resolution
+try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+}
+catch (e) {
+    // Ignore if custom DNS fallback cannot be set
+}
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,7 +23,9 @@ loadData();
 const MONGODB_URI = process.env.MONGODB_URI;
 if (MONGODB_URI) {
     mongoose
-        .connect(MONGODB_URI)
+        .connect(MONGODB_URI, {
+        serverSelectionTimeoutMS: 8000
+    })
         .then(async () => {
         console.log('🍃 Connected to MongoDB Atlas Cloud Database');
         await syncWithMongoDB();
