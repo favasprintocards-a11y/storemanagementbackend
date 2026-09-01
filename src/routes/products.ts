@@ -206,6 +206,10 @@ router.put('/:id', async (req: Request, res: Response) => {
   const newQty = quantity !== undefined ? Number(quantity) : existing.quantity;
   const newThreshold = minThreshold !== undefined ? Number(minThreshold) : existing.minThreshold;
 
+  const oldName = existing.name;
+  const oldCategory = existing.category;
+  const oldQty = existing.quantity;
+
   const updatedItem: InventoryItem = {
     ...existing,
     name: name ?? existing.name,
@@ -222,6 +226,45 @@ router.put('/:id', async (req: Request, res: Response) => {
 
   products[index] = updatedItem;
   await setProducts(products);
+
+  // Sync edits to History Logs
+  const logs = await getHistoryLogs();
+  let logsChanged = false;
+
+  // 1. Update product name and category in existing history logs for this product
+  if (updatedItem.name !== oldName || updatedItem.category !== oldCategory) {
+    logs.forEach((log) => {
+      if (log.productId === existing.id || log.productName.trim().toLowerCase() === oldName.trim().toLowerCase()) {
+        log.productName = updatedItem.name;
+        log.category = updatedItem.category;
+        logsChanged = true;
+      }
+    });
+  }
+
+  // 2. Log quantity change if stock quantity was edited
+  if (newQty !== oldQty) {
+    const diff = newQty - oldQty;
+    const qtyLog: StockHistoryLog = {
+      id: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      productId: updatedItem.id,
+      productName: updatedItem.name,
+      category: updatedItem.category,
+      type: diff >= 0 ? 'add' : 'minus',
+      changeQty: Math.abs(diff),
+      previousQty: oldQty,
+      newQty: newQty,
+      unit: updatedItem.unit,
+      timestamp: new Date().toISOString(),
+      note: `Stock quantity edited from ${oldQty} to ${newQty}`
+    };
+    logs.unshift(qtyLog);
+    logsChanged = true;
+  }
+
+  if (logsChanged) {
+    await setHistoryLogs(logs);
+  }
 
   res.json(updatedItem);
 });
