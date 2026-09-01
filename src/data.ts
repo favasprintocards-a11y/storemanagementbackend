@@ -197,6 +197,71 @@ export async function setCategories(categories: string[]): Promise<string[]> {
   return store.categories;
 }
 
+export async function renameCategory(oldName: string, newName: string): Promise<{ categories: string[]; products: InventoryItem[] }> {
+  const trimmedOld = oldName.trim();
+  const trimmedNew = newName.trim();
+  if (!trimmedOld || !trimmedNew) return { categories: store.categories, products: store.products };
+
+  const normOld = trimmedOld.toLowerCase();
+
+  store.categories = dedupeCategories(
+    store.categories.map(c => (c.trim().toLowerCase() === normOld ? trimmedNew : c))
+  );
+
+  store.products = store.products.map(p => {
+    if (p.category && p.category.trim().toLowerCase() === normOld) {
+      return { ...p, category: trimmedNew, lastUpdated: new Date().toISOString() };
+    }
+    return p;
+  });
+
+  if (store.historyLogs) {
+    store.historyLogs = store.historyLogs.map(l => {
+      if (l.category && l.category.trim().toLowerCase() === normOld) {
+        return { ...l, category: trimmedNew };
+      }
+      return l;
+    });
+  }
+
+  saveData();
+
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const oldReg = new RegExp(`^${escapeRegex(trimmedOld)}$`, 'i');
+
+      await CategoryModel.updateMany({ name: oldReg }, { $set: { name: trimmedNew } });
+      await ProductModel.updateMany({ category: oldReg }, { $set: { category: trimmedNew, lastUpdated: new Date().toISOString() } });
+      await HistoryModel.updateMany({ category: oldReg }, { $set: { category: trimmedNew } });
+    } catch (e) {
+      console.error('Error updating renamed category in MongoDB:', e);
+    }
+  }
+
+  return { categories: store.categories, products: store.products };
+}
+
+export async function deleteCategory(targetName: string): Promise<{ categories: string[]; products: InventoryItem[] }> {
+  const trimmed = targetName.trim().toLowerCase();
+  store.categories = store.categories.filter(c => c.trim().toLowerCase() !== trimmed);
+  store.products = store.products.filter(p => !p.category || p.category.trim().toLowerCase() !== trimmed);
+  saveData();
+
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const targetReg = new RegExp(`^${escapeRegex(targetName.trim())}$`, 'i');
+      await CategoryModel.deleteMany({ name: targetReg });
+      await ProductModel.deleteMany({ category: targetReg });
+    } catch (e) {
+      console.error('Error deleting category from MongoDB:', e);
+    }
+  }
+
+  return { categories: store.categories, products: store.products };
+}
+
 // Fetch Products - Live query from MongoDB Atlas when connected
 export async function getProducts(): Promise<InventoryItem[]> {
   if (mongoose.connection.readyState === 1) {

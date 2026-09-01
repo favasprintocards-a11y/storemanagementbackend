@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getCategories, setCategories } from '../data.js';
+import { getCategories, setCategories, renameCategory, deleteCategory } from '../data.js';
 const router = Router();
 // GET all categories
 router.get('/', async (_req, res) => {
@@ -23,12 +23,59 @@ router.post('/', async (req, res) => {
     await setCategories(categories);
     res.status(201).json(categories);
 });
+// PUT rename a category
+router.put('/rename', async (req, res) => {
+    const { oldName, newName } = req.body;
+    if (!oldName || !newName || typeof oldName !== 'string' || typeof newName !== 'string') {
+        res.status(400).json({ error: 'Both oldName and newName are required' });
+        return;
+    }
+    const trimmedOld = oldName.trim();
+    const trimmedNew = newName.trim();
+    if (!trimmedOld || !trimmedNew) {
+        res.status(400).json({ error: 'Category names cannot be empty' });
+        return;
+    }
+    const categories = await getCategories();
+    if (trimmedOld.toLowerCase() !== trimmedNew.toLowerCase() &&
+        categories.some(c => c.toLowerCase() === trimmedNew.toLowerCase())) {
+        res.status(400).json({ error: 'A category with this name already exists' });
+        return;
+    }
+    const result = await renameCategory(trimmedOld, trimmedNew);
+    res.json(result);
+});
+// PUT rename category by param
+router.put('/:name', async (req, res) => {
+    const oldName = decodeURIComponent(req.params.name);
+    const { newName } = req.body;
+    if (!oldName || !newName || typeof newName !== 'string') {
+        res.status(400).json({ error: 'Valid newName is required' });
+        return;
+    }
+    const trimmedOld = oldName.trim();
+    const trimmedNew = newName.trim();
+    if (!trimmedOld || !trimmedNew) {
+        res.status(400).json({ error: 'Category names cannot be empty' });
+        return;
+    }
+    const categories = await getCategories();
+    if (trimmedOld.toLowerCase() !== trimmedNew.toLowerCase() &&
+        categories.some(c => c.toLowerCase() === trimmedNew.toLowerCase())) {
+        res.status(400).json({ error: 'A category with this name already exists' });
+        return;
+    }
+    const result = await renameCategory(trimmedOld, trimmedNew);
+    res.json(result);
+});
 // DELETE a category
 router.delete('/:name', async (req, res) => {
-    const targetName = decodeURIComponent(req.params.name).trim().toLowerCase();
-    const categories = await getCategories();
-    const filtered = categories.filter(c => c.trim().toLowerCase() !== targetName);
-    await setCategories(filtered);
-    res.json(filtered);
+    const targetName = decodeURIComponent(req.params.name).trim();
+    if (!targetName) {
+        res.status(400).json({ error: 'Category name is required' });
+        return;
+    }
+    const result = await deleteCategory(targetName);
+    res.json(result.categories);
 });
 export default router;
