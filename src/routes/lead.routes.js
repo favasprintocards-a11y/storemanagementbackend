@@ -304,7 +304,7 @@ async function attachLastEnteredRemarks(leads) {
 
     // Must be entered by a sales team member
     const isSales = (act.user_id && salesUserIds.has(act.user_id.toString())) ||
-                    salesUserNames.has((act.user_name || '').trim().toLowerCase());
+      salesUserNames.has((act.user_name || '').trim().toLowerCase());
 
     if (isSales && !remarkMap.has(lid)) {
       remarkMap.set(lid, note);
